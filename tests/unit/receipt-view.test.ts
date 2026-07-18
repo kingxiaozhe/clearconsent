@@ -93,6 +93,18 @@ describe('logTableHtml', () => {
     expect(html).toContain('a.com');
     expect(html).not.toContain('b.com');
   });
+  it('动作 label 单次转义不双重转义（N4）', () => {
+    const r = mkResult('a.com', 1);
+    r.actions = [{ kind: 'hide', selector: 'x', label: 'a<b' }];
+    const html = logTableHtml([r], null);
+    expect(html).toContain('a&lt;b');
+    expect(html).not.toContain('&amp;lt;'); // 无双重转义
+  });
+  it('畸形 strategy 回退值被转义（N4）', () => {
+    const r = mkResult('a.com', 1);
+    (r as { strategy: string }).strategy = '<script>';
+    expect(receiptHtml('handled', r)).not.toContain('<script>');
+  });
   it('badgeHtml 输出对应文案', () => {
     expect(badgeHtml('handled')).toContain('已处理');
   });

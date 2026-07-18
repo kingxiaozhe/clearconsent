@@ -55,12 +55,14 @@ export function receiptHtml(state: BadgeState, result: ProcessResult | null): st
   const lines = result.actions
     .map((a) => `<div class="receipt-line"><span class="k">${esc(a.label)}</span></div>`)
     .join('');
-  const strategyText =
+  // 映射未命中时回退原值必须转义——畸形/被篡改的 storage 否则可经此注入（N4）
+  const strategyText = esc(
     {
       'essential-only': '仅必要 Cookie',
       'reject-all-first': '全部拒绝优先',
       'hide-only': '只隐藏',
-    }[result.strategy] ?? result.strategy;
+    }[result.strategy] ?? result.strategy,
+  );
   return `
     <div class="receipt">
       <div class="receipt-line receipt-head"><span class="k">处 理 收 据</span><span class="v">${strategyText}</span></div>
@@ -81,9 +83,10 @@ export function logTableHtml(rows: ProcessResult[], siteFilter: string | null): 
     .slice()
     .reverse()
     .map((r) => {
-      const time = new Date(r.ts).toLocaleString('zh-CN', { hour12: false });
+      const time = esc(new Date(r.ts).toLocaleString('zh-CN', { hour12: false }));
+      // 每个 label 已转义,拼接后不再二次转义（N4：旧版 esc(acts) 把 < 变 &amp;lt;）
       const acts = r.actions.map((a) => esc(a.label)).join('；') || '（无动作）';
-      return `<tr><td>${esc(time)}</td><td>${esc(r.site)}</td><td>${esc(acts)}</td><td>${esc(r.ruleId)}</td></tr>`;
+      return `<tr><td>${time}</td><td>${esc(r.site)}</td><td>${acts}</td><td>${esc(r.ruleId)}</td></tr>`;
     })
     .join('');
   return `<table class="log"><thead><tr><th>时间</th><th>站点</th><th>动作</th><th>规则</th></tr></thead><tbody>${body}</tbody></table>`;
