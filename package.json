@@ -15,7 +15,7 @@
     "format": "prettier --write .",
     "lint": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "playwright test",
+    "test:e2e": "wxt build && playwright test",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

@@ -17,6 +17,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm test # 单元测试（N4：CI 此前不跑测试）；E2E 需真实浏览器+显示器，作本地门
       - run: npm run build
       - run: npm run zip
       - uses: actions/upload-artifact@v4

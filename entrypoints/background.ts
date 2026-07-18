@@ -45,12 +45,8 @@ export default defineBackground(() => {
       } else if (!enabled && !has) {
         await setSiteDisabled([...disabled, host]);
       }
-      // 广播（content 侧监听 site-enabled-changed，实时刷新——F3 消费）
-      chrome.runtime
-        .sendMessage({ type: 'site-enabled-changed', payload: { site: host, enabled } })
-        .catch(() => {
-          /* 无接收端时静默 */
-        });
+      // 落 storage 后，content script 经 chrome.storage.onChanged 原生收到变更并重探——
+      // N4：SW 的 runtime.sendMessage 到不了 content script，故不在此广播，靠 storage 事件传播。
       return { ok: true, site: host, enabled };
     },
   });

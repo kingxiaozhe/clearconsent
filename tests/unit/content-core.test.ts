@@ -33,6 +33,7 @@ function deps(over: Partial<ContentDeps> = {}): { d: ContentDeps; reports: unkno
     }),
     report: async (r) => {
       reports.push(r);
+      return true;
     },
     ...over,
   };
@@ -99,5 +100,57 @@ describe('runOnce', () => {
     const { d, reports } = deps({ detect: async () => null });
     expect(await runOnce(d, new Set())).toBe(false);
     expect(reports).toHaveLength(0);
+  });
+
+  it('上报失败释放幂等键，允许重试（N4④）', async () => {
+    const { d } = deps({ report: async () => false });
+    const processed = new Set<string>();
+    await runOnce(d, processed);
+    expect(processed.size).toBe(0); // 键被释放
+  });
+
+  it('detect 等待中被停用则不执行（N4③执行前复查状态）', async () => {
+    let calls = 0;
+    const exec = vi.fn(async () => ({
+      outcome: 'handled' as const,
+      actions: [],
+      strategyUsed: 'essential-only' as const,
+    }));
+    const { d, reports } = deps({
+      getState: async () => {
+        calls++;
+        // 第一次（探测前）enabled，第二次（执行前）已停用
+        return {
+          site: 'example.com',
+          enabled: calls === 1,
+          whitelisted: false,
+          lastResult: null,
+        };
+      },
+      execute: exec,
+    });
+    await runOnce(d, new Set());
+    expect(exec).not.toHaveBeenCalled();
+    expect(reports).toHaveLength(0);
+  });
+
+  it('已处理规则被排除，让位后出现的新 CMP（N4②多CMP）', async () => {
+    const ruleB: CmpRule = {
+      id: 'cookiebot',
+      name: 'Cookiebot',
+      detect: '#c',
+      actions: { 'essential-only': [], 'reject-all-first': [], 'hide-only': [] },
+    };
+    const processed = new Set<string>([idempotencyKey('example.com', 'onetrust')]);
+    // getRules 返回两条；onetrust 已处理应被过滤，detect 只会收到 [cookiebot]
+    const { d, reports } = deps({
+      getRules: async () => [rule, ruleB],
+      detect: async (rules) => {
+        expect(rules.map((r) => r.id)).toEqual(['cookiebot']); // onetrust 已被排除
+        return { rule: ruleB, element: {} as Element };
+      },
+    });
+    await runOnce(d, processed);
+    expect((reports[0] as { ruleId: string }).ruleId).toBe('cookiebot');
   });
 });

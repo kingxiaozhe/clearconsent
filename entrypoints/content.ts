@@ -28,7 +28,8 @@ export default defineContentScript({
       detect: (rules) => detectCmp(rules),
       execute: (rule, strategy) => executeStrategy(rule, strategy),
       report: async (result) => {
-        await sendMessage('process-result', result);
+        const resp = await sendMessage('process-result', result);
+        return resp?.ok === true; // 失败（undefined）→ content-core 释放幂等键重试
       },
     };
 
@@ -48,9 +49,12 @@ export default defineContentScript({
     // history.pushState/replaceState 不触发事件，用轻量轮询兜底（SPA 常用 pushState）
     setInterval(onNav, 1000);
 
-    // 本站开关实时切换：SW 广播 site-enabled-changed 时重探（F3 消费）
-    chrome.runtime.onMessage.addListener((msg: { type?: string }) => {
-      if (msg?.type === 'site-enabled-changed') tick();
+    // 本站开关/偏好实时切换：直接监听 chrome.storage.onChanged（content script 原生可收，
+    // 无需 SW 广播——N4：SW 的 runtime.sendMessage 到不了 content script）。F3 改这些 key 即触发重探。
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && (changes.siteDisabled || changes.settings || changes.whitelist)) {
+        tick();
+      }
     });
   },
 });

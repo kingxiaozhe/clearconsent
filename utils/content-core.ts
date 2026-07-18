@@ -14,7 +14,7 @@ export interface ContentDeps {
   getRules: () => Promise<CmpRule[]>;
   detect: (rules: CmpRule[]) => Promise<Match | null>;
   execute: (rule: CmpRule, strategy: Strategy) => Promise<ExecResult>;
-  report: (result: ProcessResult) => Promise<void>;
+  report: (result: ProcessResult) => Promise<boolean>; // 返回是否上报成功（N4：失败要释放幂等键重试）
   now: () => number;
   href: () => string;
   site: string;
@@ -33,18 +33,27 @@ export async function runOnce(deps: ContentDeps, processed: Set<string>): Promis
   const state = await deps.getState();
   if (!shouldProcess(state)) return false; // 白名单/停用/全局暂停 → 零操作零日志（AC-106）
 
-  const rules = await deps.getRules();
+  // N4②：探测前先排除已处理规则——否则残留的旧 CMP（已隐藏但仍在 DOM）会一直被首匹配命中，
+  // 遮住页面上后出现的新 CMP。过滤后 detect 只在未处理规则里找。
+  const rules = (await deps.getRules()).filter(
+    (r) => !processed.has(idempotencyKey(deps.site, r.id)),
+  );
+  if (rules.length === 0) return false;
+
   const match = await deps.detect(rules);
   if (!match) return false;
 
+  // N4③：detect 可能等待数秒，其间用户可能停用/加白——执行前再查一次状态
+  const state2 = await deps.getState();
+  if (!shouldProcess(state2)) return false;
+
   const key = idempotencyKey(deps.site, match.rule.id);
-  if (processed.has(key)) return false; // 幂等：同一 CMP 已处理
   processed.add(key);
 
   const strategy = await deps.getStrategy();
   const started = deps.now();
   const result = await deps.execute(match.rule, strategy);
-  // skipped（选择器全未命中）不占幂等：允许后续重试；handled/failed 记日志
+  // skipped（选择器全未命中）不占幂等：允许后续重试
   if (result.outcome === 'skipped') {
     processed.delete(key);
     return false;
@@ -60,6 +69,11 @@ export async function runOnce(deps: ContentDeps, processed: Set<string>): Promis
     ruleId: match.rule.id,
     ts: deps.now(),
   };
-  await deps.report(record);
+  // N4④：上报失败（SW 未就绪/异常）释放幂等键，让下一轮重试，避免永久漏收据
+  const reported = await deps.report(record);
+  if (!reported) {
+    processed.delete(key);
+    return false;
+  }
   return result.outcome === 'handled';
 }
