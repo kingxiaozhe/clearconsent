@@ -1,14 +1,136 @@
-/* 占位样式，F2 按 design-baseline/V3-quiet-white（纸白+茶绿）替换 */
+/* V3 纸白设计还原（结构级）：纸白底 + 衬线大状态词 + 等宽收据 + 茶绿 accent + 细分隔线。 */
 :root {
-  font-family:
-    system-ui,
-    -apple-system,
-    sans-serif;
+  --paper: #fafaf8;
+  --ink: #1c1c1a;
+  --muted: #6b6b66;
+  --line: #e5e4df;
+  --accent: #3f6b52; /* 茶绿 */
+  --serif: 'Songti SC', 'Noto Serif SC', Georgia, serif;
+  --mono: 'SF Mono', 'JetBrains Mono', ui-monospace, monospace;
+  --sans: system-ui, -apple-system, sans-serif;
+}
+* {
+  box-sizing: border-box;
 }
 body {
   margin: 0;
-  min-width: 320px;
+  min-width: 340px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
 }
-#app {
-  padding: 16px;
+.hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.wordmark {
+  font-family: var(--serif);
+  font-size: 16px;
+  font-weight: 600;
+}
+.wordmark .dot {
+  color: var(--accent);
+}
+.pad {
+  padding: 18px;
+}
+.site {
+  color: var(--muted);
+  font-size: 13px;
+}
+.status-word {
+  font-family: var(--serif);
+  font-size: 40px;
+  line-height: 1.1;
+  margin: 4px 0 14px;
+}
+.status-word::before {
+  content: '•';
+  color: var(--accent);
+  margin-right: 8px;
+}
+/* 徽章（V2 语言，V3 茶绿配色） */
+.badge {
+  font-size: 12px;
+  padding: 3px 9px;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.badge--handled {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.badge--paused {
+  color: #a8681e;
+  border-color: #d9b58a;
+}
+.badge--whitelisted {
+  color: #4a5a86;
+  border-color: #b6c0da;
+}
+/* 处理收据：等宽 + 虚线分隔（小票母题） */
+.receipt {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  border-top: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+.receipt-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.receipt-head {
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+.receipt-line .k {
+  color: var(--ink);
+}
+.receipt-line .v {
+  color: var(--muted);
+}
+.receipt-empty {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 10px 0;
+}
+.summary {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.summary b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.controls {
+  padding: 12px 18px;
+  border-top: 1px solid var(--line);
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+.link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 6px 0;
+  font-size: 13px;
+}
+.ft {
+  padding: 10px 18px 16px;
+  color: var(--muted);
+  font-size: 11.5px;
+  border-top: 1px solid var(--line);
 }
