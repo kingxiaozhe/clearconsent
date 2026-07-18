@@ -1,8 +1,8 @@
 {
-  "name": "wxt-starter",
+  "name": "clearconsent",
   "description": "manifest.json description",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -11,10 +11,13 @@
     "build:firefox": "wxt build -b firefox",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
-    "compile": "tsc --noEmit",
-    "postinstall": "wxt prepare"
+    "postinstall": "wxt prepare",
+    "format": "prettier --write .",
+    "lint": "prettier --check .",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "prettier": "^3.4.2",
     "typescript": "^5.9.3",
     "wxt": "^0.20.27"
   }

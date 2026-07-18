@@ -1,6 +1,6 @@
 ---
 description: 扩展铁律——权限、MV3 约束、消息契约、透明性
-globs: "entrypoints/**, wxt.config.ts"
+globs: 'entrypoints/**, wxt.config.ts'
 ---
 
 # 浏览器扩展规范
