@@ -1,5 +1,5 @@
 // 执行器：按策略对页面执行动作序列。红线（槽点 #2）——绝不误伤宿主页：
-// 只操作规则声明的选择器、hide 后成对恢复滚动锁、任何异常静默不冒泡。
+// 只操作规则声明的选择器、拒绝隐藏整页、不碰宿主自己的滚动锁、任何异常静默不冒泡。
 
 import type { ProcessAction, ProcessOutcome, Strategy } from './types';
 import type { CmpRule, RuleAction } from './rules-format';
@@ -12,12 +12,13 @@ export interface ExecResult {
 
 export interface ExecOptions {
   root?: Document;
-  perActionTimeoutMs?: number; // 单个动作等选择器出现的上限，默认 1000
+  perActionTimeoutMs?: number; // 单动作等选择器出现上限，默认 800
+  totalBudgetMs?: number; // 整个序列总预算，默认 2500（守护项 3「快」：多动作等待不无限累加）
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-/** 轮询等选择器出现（按钮常晚于容器几十毫秒）。非法选择器直接返回 null，不抛。 */
+/** 轮询等选择器出现（按钮常晚于容器）。坏选择器直接返回 null，不抛。 */
 async function waitFor(
   root: ParentNode,
   selector: string,
@@ -29,7 +30,7 @@ async function waitFor(
     try {
       el = root.querySelector(selector);
     } catch {
-      return null; // 坏选择器
+      return null;
     }
     if (el) return el;
     if (Date.now() >= deadline) return null;
@@ -37,75 +38,97 @@ async function waitFor(
   }
 }
 
-/** 执行单个动作，成功返回其 ProcessAction 记录，跳过/失败返回 null。 */
+function isDisabled(el: Element): boolean {
+  return (
+    (el as HTMLButtonElement).disabled === true ||
+    el.getAttribute('aria-disabled') === 'true' ||
+    el.hasAttribute('disabled')
+  );
+}
+
+/** 执行单个动作。成功返回记录，跳过/失败返回 null。 */
 async function runAction(
   action: RuleAction,
   root: Document,
   timeoutMs: number,
 ): Promise<ProcessAction | null> {
-  const el = await waitFor(root, action.selector, action.optional ? 0 : timeoutMs);
-  if (!el) return null; // 缺失：optional 静默、required 记为未命中（上层判回退）
+  const el = await waitFor(root, action.selector, timeoutMs);
+  if (!el) return null;
   if (action.kind === 'click') {
+    // N4：禁用/无效按钮 click() 无效果，却会被误记为成功而阻断回退——视为未命中
+    if (isDisabled(el)) return null;
     (el as HTMLElement).click();
   } else {
+    // N4：拒绝隐藏整页元素（规则若误写 html/body，隐藏=整站白屏）
+    const tag = el.tagName?.toLowerCase();
+    if (tag === 'html' || tag === 'body') return null;
     (el as HTMLElement).style.setProperty('display', 'none', 'important');
   }
   return { kind: action.kind, selector: action.selector, label: action.label };
 }
 
-/** hide 后恢复被 CMP 锁死的滚动（成对恢复，防隐藏横幅却留下 scroll-lock 白页）。 */
+/**
+ * 恢复被 CMP 锁死的滚动。N4：只清 body 的**内联** overflow:hidden，绝不动 position:fixed
+ * 或 documentElement——那些更可能是宿主自己的登录/支付弹窗锁，误清会解锁宿主模态。
+ * 残留风险（宿主恰好也用 body 内联 overflow:hidden）记 LESSONS，待后续按 CMP 归因细化。
+ */
 function restoreScroll(doc: Document): void {
-  for (const el of [doc.body, doc.documentElement]) {
-    if (!el) continue;
-    if (el.style.overflow === 'hidden') el.style.overflow = '';
-    if (el.style.position === 'fixed') el.style.position = '';
-  }
+  const body = doc.body;
+  if (body && body.style.overflow === 'hidden') body.style.overflow = '';
 }
 
 async function runSequence(
   actions: RuleAction[],
   root: Document,
-  timeoutMs: number,
-): Promise<{ done: ProcessAction[]; hadHide: boolean; clickHit: boolean }> {
+  perActionTimeoutMs: number,
+  deadline: number,
+): Promise<{ done: ProcessAction[]; hadHide: boolean }> {
   const done: ProcessAction[] = [];
   let hadHide = false;
-  let clickHit = false;
   for (const a of actions) {
-    const rec = await runAction(a, root, timeoutMs);
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break; // N4：总预算耗尽，不再串行累加等待
+    const to = a.optional ? 0 : Math.min(perActionTimeoutMs, remaining);
+    const rec = await runAction(a, root, to);
     if (rec) {
       done.push(rec);
       if (rec.kind === 'hide') hadHide = true;
-      if (rec.kind === 'click') clickHit = true;
     }
   }
-  return { done, hadHide, clickHit };
+  return { done, hadHide };
 }
 
 /**
- * 按策略执行。reject-all-first 无拒绝路径（零点击命中）时回退 essential-only。
- * 全程 try 包裹——任何异常静默，返回 failed，绝不冒泡到宿主页。
+ * 按策略执行。reject-all-first **完全无所作为**（零动作命中）时才回退 essential-only——
+ * N4：旧版按「无点击」回退会在已隐藏后覆盖记录、漏恢复滚动、策略漂移。
+ * 全程 try 包裹，任何异常静默返回 failed，绝不冒泡到宿主页。
  */
 export async function executeStrategy(
   rule: CmpRule,
   strategy: Strategy,
   opts: ExecOptions = {},
 ): Promise<ExecResult> {
-  const { root = document, perActionTimeoutMs = 1000 } = opts;
+  const { root = document, perActionTimeoutMs = 800, totalBudgetMs = 2500 } = opts;
+  const deadline = Date.now() + totalBudgetMs;
   try {
     let used: Strategy = strategy;
-    let { done, hadHide, clickHit } = await runSequence(
+    let { done, hadHide } = await runSequence(
       rule.actions[strategy],
       root,
       perActionTimeoutMs,
+      deadline,
     );
 
-    // 全部拒绝优先：本档需要点击但零命中 → 回退仅必要
-    if (
-      strategy === 'reject-all-first' &&
-      !clickHit &&
-      rule.actions['reject-all-first'].some((a) => a.kind === 'click')
-    ) {
-      const fb = await runSequence(rule.actions['essential-only'], root, perActionTimeoutMs);
+    const essentialDiffers =
+      JSON.stringify(rule.actions['essential-only']) !==
+      JSON.stringify(rule.actions['reject-all-first']);
+    if (strategy === 'reject-all-first' && done.length === 0 && essentialDiffers) {
+      const fb = await runSequence(
+        rule.actions['essential-only'],
+        root,
+        perActionTimeoutMs,
+        deadline,
+      );
       if (fb.done.length > 0) {
         used = 'essential-only';
         done = fb.done;

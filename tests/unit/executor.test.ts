@@ -80,6 +80,46 @@ describe('executeStrategy', () => {
     expect(r.actions).toHaveLength(0);
   });
 
+  it('禁用的拒绝按钮视为未命中，仍回退 essential（N4④）', async () => {
+    let essentialClicked = false;
+    document.body.innerHTML =
+      '<div id="banner"></div><button id="reject" disabled></button><button id="essential"></button>';
+    document
+      .querySelector('#essential')!
+      .addEventListener('click', () => (essentialClicked = true));
+    const r = await executeStrategy(ruleWith(true), 'reject-all-first', {
+      perActionTimeoutMs: 100,
+    });
+    expect(essentialClicked).toBe(true);
+    expect(r.strategyUsed).toBe('essential-only');
+  });
+
+  it('规则误写隐藏 body 时拒绝执行（N4③防整页白屏）', async () => {
+    const evil: CmpRule = {
+      id: 'e',
+      name: 'e',
+      detect: '#banner',
+      actions: {
+        'essential-only': [{ kind: 'hide', selector: 'body', label: 'x' }],
+        'reject-all-first': [{ kind: 'hide', selector: 'body', label: 'x' }],
+        'hide-only': [{ kind: 'hide', selector: 'body', label: 'x' }],
+      },
+    };
+    document.body.innerHTML = '<div id="banner"></div>';
+    const r = await executeStrategy(evil, 'hide-only', { perActionTimeoutMs: 50 });
+    expect(r.outcome).toBe('skipped');
+    expect(document.body.style.display).not.toBe('none');
+  });
+
+  it('不清除 position:fixed（N4②保护宿主支付/登录模态）', async () => {
+    document.body.innerHTML = '<div id="banner"></div>';
+    document.body.style.position = 'fixed';
+    document.body.style.overflow = 'hidden';
+    await executeStrategy(ruleWith(true), 'hide-only', { perActionTimeoutMs: 100 });
+    expect(document.body.style.position).toBe('fixed'); // 未被动过
+    expect(document.body.style.overflow).toBe(''); // 只恢复 overflow
+  });
+
   it('非法选择器不抛错，静默返回', async () => {
     const bad: CmpRule = {
       id: 'b',
