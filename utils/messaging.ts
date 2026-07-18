@@ -19,11 +19,15 @@ export interface Message<T extends MessageType = MessageType> {
   payload: MessageMap[T]['payload'];
 }
 
-/** 发送方（content/popup/options）。Promise 风格，全项目统一。 */
+/**
+ * 发送方（content/popup/options）。Promise 风格，全项目统一。
+ * 返回可能为 undefined（SW 处理器抛错/无处理器/SW 未就绪）——调用方必须判空，
+ * 不得假设一定拿到响应（N4 拦截：处理器拒绝时旧实现类型撒谎成功，读 ok 会崩）。
+ */
 export async function sendMessage<T extends MessageType>(
   type: T,
   payload: MessageMap[T]['payload'],
-): Promise<MessageMap[T]['response']> {
+): Promise<MessageMap[T]['response'] | undefined> {
   return chrome.runtime.sendMessage({ type, payload } satisfies Message<T>);
 }
 
@@ -41,8 +45,10 @@ export function registerHandlers(handlers: {
     Promise.resolve(handler(msg.payload as never, sender))
       .then(sendResponse)
       .catch((err) => {
+        // 处理器失败：记录并回传 undefined。sendMessage 返回类型已含 undefined，
+        // 调用方被类型强制判空——失败不会被误当成功（N4 拦截点）。
         console.error(`[ClearConsent] handler ${msg.type} failed`, err);
-        sendResponse(undefined as never);
+        sendResponse(undefined);
       });
     return true;
   });

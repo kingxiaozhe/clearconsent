@@ -29,22 +29,34 @@ async function getRaw<K extends keyof Schema>(key: K): Promise<Schema[K]> {
   return (got[key] as Schema[K]) ?? DEFAULTS[key];
 }
 
-async function setRaw<K extends keyof Schema>(key: K, value: Schema[K]): Promise<void> {
-  await chrome.storage.local.set({ [key]: value });
+// 串行写队列（N4 拦截）：MV3 下多个 content 并发上报，read-modify-write（如 appendLog）
+// 若不串行会丢写；且首启 ensureSchema 与写入交错会被默认值覆盖。所有变更 storage 的操作
+// 一律经 serialize()，天然按入队顺序执行——ensureSchema 顶层最先入队，后续写入排其后。
+let writeChain: Promise<unknown> = Promise.resolve();
+function serialize<T>(task: () => Promise<T>): Promise<T> {
+  const run = writeChain.then(task, task);
+  writeChain = run.catch(() => {});
+  return run;
 }
 
-/** 首次运行或版本落后时补齐默认值并迁移。SW 顶层调用一次。 */
-export async function ensureSchema(): Promise<void> {
-  const { schemaVersion } = await chrome.storage.local.get('schemaVersion');
-  if (schemaVersion === SCHEMA_VERSION) return;
-  // 迁移占位：未来 schemaVersion 落后时按版本逐级迁移。当前仅补默认值。
-  const existing = await chrome.storage.local.get(null);
-  const merged: Partial<Schema> = { schemaVersion: SCHEMA_VERSION };
-  for (const key of Object.keys(DEFAULTS) as (keyof Schema)[]) {
-    if (key === 'schemaVersion') continue;
-    if (existing[key] === undefined) (merged as Record<string, unknown>)[key] = DEFAULTS[key];
-  }
-  await chrome.storage.local.set(merged);
+async function setRaw<K extends keyof Schema>(key: K, value: Schema[K]): Promise<void> {
+  await serialize(() => chrome.storage.local.set({ [key]: value }));
+}
+
+/** 首次运行或版本落后时补齐默认值并迁移。SW 顶层调用一次（最先入写队列）。 */
+export function ensureSchema(): Promise<void> {
+  return serialize(async () => {
+    const { schemaVersion } = await chrome.storage.local.get('schemaVersion');
+    if (schemaVersion === SCHEMA_VERSION) return;
+    // 迁移占位：未来 schemaVersion 落后时按版本逐级迁移。当前仅补默认值。
+    const existing = await chrome.storage.local.get(null);
+    const merged: Partial<Schema> = { schemaVersion: SCHEMA_VERSION };
+    for (const key of Object.keys(DEFAULTS) as (keyof Schema)[]) {
+      if (key === 'schemaVersion') continue;
+      if (existing[key] === undefined) (merged as Record<string, unknown>)[key] = DEFAULTS[key];
+    }
+    await chrome.storage.local.set(merged);
+  });
 }
 
 export const getSettings = () => getRaw('settings');
@@ -61,12 +73,18 @@ export const setRulesMeta = (m: RulesMeta) => setRaw('rules-meta', m);
 
 export const getLog = () => getRaw('log');
 
-/** 环形队列写入：超 LOG_LIMIT 丢最旧。日志只进本机 storage，永不出网。 */
-export async function appendLog(entry: ProcessResult): Promise<void> {
-  const log = await getRaw('log');
-  log.push(entry);
-  if (log.length > LOG_LIMIT) log.splice(0, log.length - LOG_LIMIT);
-  await setRaw('log', log);
+/**
+ * 环形队列写入：超 LOG_LIMIT 丢最旧。日志只进本机 storage，永不出网。
+ * 整个 read-modify-write 包进单个 serialize()——保证并发上报不互相覆盖（N4 拦截的丢日志竞态）。
+ */
+export function appendLog(entry: ProcessResult): Promise<void> {
+  return serialize(async () => {
+    const got = await chrome.storage.local.get('log');
+    const log = (got.log as ProcessResult[]) ?? [];
+    log.push(entry);
+    if (log.length > LOG_LIMIT) log.splice(0, log.length - LOG_LIMIT);
+    await chrome.storage.local.set({ log });
+  });
 }
 
 export async function clearLog(): Promise<void> {
