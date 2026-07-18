@@ -4,10 +4,16 @@ import { ensureSchema } from '@/utils/storage';
 import { registerHandlers } from '@/utils/messaging';
 
 export default defineBackground(() => {
-  // schema 初始化（首装/升级补默认值）。副作用，不阻塞监听器注册。
-  ensureSchema().catch((e) => console.error('[ClearConsent] ensureSchema', e));
-
-  // 业务处理器由 F1/F3 填充（process-result / get-site-state / set-site-enabled）。
+  // 消息处理器顶层同步注册——SW 休眠唤醒时只重放顶层注册。
+  // 业务处理器由 F1/F3 填充（process-result / get-site-state / set-site-enabled）；
   // 底座只建立注册通道，保证契约入口存在。
   registerHandlers({});
+
+  // schema 初始化放 onInstalled（MV3 标准初始化位，安装/更新即唤醒 SW 执行）。
+  chrome.runtime.onInstalled.addListener(() => {
+    ensureSchema().catch((e) => console.error('[ClearConsent] ensureSchema', e));
+  });
+
+  // SW 冷启动也补一次（幂等：schemaVersion 命中即返回），保证读数据前 schema 就绪。
+  ensureSchema().catch((e) => console.error('[ClearConsent] ensureSchema', e));
 });

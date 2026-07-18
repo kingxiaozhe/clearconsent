@@ -14,12 +14,17 @@
     "postinstall": "wxt prepare",
     "format": "prettier --write .",
     "lint": "prettier --check .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "test": "vitest run",
+    "test:unit": "vitest run"
   },
   "devDependencies": {
+    "@playwright/test": "^1.49.1",
     "@types/chrome": "^0.0.287",
     "prettier": "^3.4.2",
     "typescript": "^5.9.3",
+    "vitest": "^2.1.8",
     "wxt": "^0.20.27"
   }
 }

@@ -1,0 +1,83 @@
+{
+  "_note": "Consent-O-Matic 规则格式的子集样例（5 站），用于验证 convert-rules.mjs 的映射。真实 C-o-M 规则的 detectors[].presentMatcher.target.selector 结构保留；methods 用简化词汇 REJECT_ALL/HIDE_CMP 表达常见拒绝/隐藏动作。",
+  "onetrust": {
+    "detectors": [
+      { "presentMatcher": { "type": "css", "target": { "selector": "#onetrust-banner-sdk" } } }
+    ],
+    "methods": [
+      {
+        "name": "REJECT_ALL",
+        "action": {
+          "target": { "selector": "#onetrust-reject-all-handler" },
+          "label": "Reject All"
+        }
+      },
+      {
+        "name": "HIDE_CMP",
+        "action": { "target": { "selector": "#onetrust-banner-sdk" }, "label": "OneTrust banner" }
+      }
+    ]
+  },
+  "quantcast": {
+    "detectors": [
+      { "presentMatcher": { "type": "css", "target": { "selector": ".qc-cmp2-container" } } }
+    ],
+    "methods": [
+      {
+        "name": "REJECT_ALL",
+        "action": {
+          "target": { "selector": ".qc-cmp2-summary-buttons button[mode=\"secondary\"]" },
+          "label": "Reject"
+        }
+      },
+      {
+        "name": "HIDE_CMP",
+        "action": { "target": { "selector": ".qc-cmp2-container" }, "label": "Quantcast banner" }
+      }
+    ]
+  },
+  "cookiebot": {
+    "detectors": [
+      { "presentMatcher": { "type": "css", "target": { "selector": "#CybotCookiebotDialog" } } }
+    ],
+    "methods": [
+      {
+        "name": "REJECT_ALL",
+        "action": {
+          "target": { "selector": "#CybotCookiebotDialogBodyButtonDecline" },
+          "label": "Decline"
+        }
+      },
+      {
+        "name": "HIDE_CMP",
+        "action": { "target": { "selector": "#CybotCookiebotDialog" }, "label": "Cookiebot dialog" }
+      }
+    ]
+  },
+  "osano": {
+    "detectors": [
+      { "presentMatcher": { "type": "css", "target": { "selector": ".osano-cm-dialog" } } }
+    ],
+    "methods": [
+      {
+        "name": "REJECT_ALL",
+        "action": { "target": { "selector": ".osano-cm-denyAll" }, "label": "Deny All" }
+      },
+      {
+        "name": "HIDE_CMP",
+        "action": { "target": { "selector": ".osano-cm-dialog" }, "label": "Osano dialog" }
+      }
+    ]
+  },
+  "trustarc": {
+    "detectors": [
+      { "presentMatcher": { "type": "css", "target": { "selector": "#truste-consent-track" } } }
+    ],
+    "methods": [
+      {
+        "name": "HIDE_CMP",
+        "action": { "target": { "selector": "#truste-consent-track" }, "label": "TrustArc" }
+      }
+    ]
+  }
+}
