@@ -1,5 +1,6 @@
 // 信任站点 tab（F3 T-015/T-016）：列表 + 添加 + 删除。写 whitelist，content 经 storage.onChanged 即时生效。
-import { getWhitelist, setWhitelist } from '@/utils/storage';
+import { getWhitelist, updateWhitelist } from '@/utils/storage';
+// getWhitelist 用于初始渲染读取；增删走 updateWhitelist 原子操作
 import { addHost, removeHost } from '@/utils/whitelist';
 import type { OptionsTab } from './tabs';
 
@@ -36,9 +37,8 @@ export const whitelistTab: OptionsTab = {
 
     const input = c.querySelector<HTMLInputElement>('#wl-input')!;
     const add = async () => {
-      const cur = await getWhitelist();
-      const next = addHost(cur, input.value);
-      if (next !== cur) await setWhitelist(next);
+      const val = input.value;
+      await updateWhitelist((cur) => addHost(cur, val)); // 原子读改写（N4）
       input.value = '';
       this.render(c);
     };
@@ -48,7 +48,7 @@ export const whitelistTab: OptionsTab = {
     });
     c.querySelectorAll<HTMLButtonElement>('.del').forEach((b) =>
       b.addEventListener('click', async () => {
-        await setWhitelist(removeHost(await getWhitelist(), b.dataset.host!));
+        await updateWhitelist((cur) => removeHost(cur, b.dataset.host!));
         this.render(c);
       }),
     );

@@ -1,5 +1,5 @@
 // 偏好 tab（F3 T-015）：应答策略三选一 + 全局暂停。写 settings，content 经 storage.onChanged 即时生效。
-import { getSettings, setSettings } from '@/utils/storage';
+import { getSettings, updateSettings } from '@/utils/storage';
 import { STRATEGIES, type Strategy } from '@/utils/types';
 import type { OptionsTab } from './tabs';
 
@@ -44,14 +44,13 @@ export const preferencesTab: OptionsTab = {
 
     c.querySelectorAll<HTMLInputElement>('input[name="strategy"]').forEach((r) =>
       r.addEventListener('change', async () => {
-        const cur = await getSettings();
-        await setSettings({ ...cur, strategy: r.value as Strategy });
+        await updateSettings((cur) => ({ ...cur, strategy: r.value as Strategy })); // 原子（N4）
         this.render(c);
       }),
     );
     c.querySelector<HTMLInputElement>('#global-toggle')?.addEventListener('change', async (e) => {
-      const cur = await getSettings();
-      await setSettings({ ...cur, globalEnabled: !(e.target as HTMLInputElement).checked });
+      const paused = (e.target as HTMLInputElement).checked;
+      await updateSettings((cur) => ({ ...cur, globalEnabled: !paused }));
     });
   },
 };

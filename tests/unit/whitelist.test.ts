@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addHost, removeHost, hasHost } from '../../utils/whitelist';
+import { addHost, removeHost, hasHost, isValidHost } from '../../utils/whitelist';
 
 describe('whitelist', () => {
   it('添加归一化 host', () => {
@@ -10,6 +10,14 @@ describe('whitelist', () => {
   });
   it('空输入不添加', () => {
     expect(addHost(['a.com'], '  ')).toEqual(['a.com']);
+  });
+  it('非法非空值不入库（N4：https:// / a/b / 无点）', () => {
+    expect(addHost([], 'https://')).toEqual([]);
+    expect(addHost([], 'a/b')).toEqual([]);
+    expect(addHost([], 'nodot')).toEqual([]);
+    expect(isValidHost('example.com')).toBe(true);
+    expect(isValidHost('localhost')).toBe(true);
+    expect(isValidHost('a b.com')).toBe(false);
   });
   it('删除按归一化匹配', () => {
     expect(removeHost(['example.com', 'b.com'], 'www.example.com')).toEqual(['b.com']);

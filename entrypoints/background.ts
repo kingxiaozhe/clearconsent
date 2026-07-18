@@ -9,7 +9,7 @@ import {
   getSettings,
   getSiteDisabled,
   getWhitelist,
-  setSiteDisabled,
+  updateSiteDisabled,
 } from '@/utils/storage';
 import { registerHandlers } from '@/utils/messaging';
 import { computeSiteState } from '@/utils/site-state';
@@ -38,13 +38,13 @@ export default defineBackground(() => {
     // popup/options 切本站开关 → 落 siteDisabled，广播给该站已注入的 content（即时生效）
     'set-site-enabled': async ({ site, enabled }) => {
       const host = normalizeHost(site);
-      const disabled = await getSiteDisabled();
-      const has = disabled.some((h) => normalizeHost(h) === host);
-      if (enabled && has) {
-        await setSiteDisabled(disabled.filter((h) => normalizeHost(h) !== host));
-      } else if (!enabled && !has) {
-        await setSiteDisabled([...disabled, host]);
-      }
+      // 原子读改写（N4）：并发切开关不互相覆盖
+      await updateSiteDisabled((disabled) => {
+        const has = disabled.some((h) => normalizeHost(h) === host);
+        if (enabled && has) return disabled.filter((h) => normalizeHost(h) !== host);
+        if (!enabled && !has) return [...disabled, host];
+        return disabled;
+      });
       // 落 storage 后，content script 经 chrome.storage.onChanged 原生收到变更并重探——
       // N4：SW 的 runtime.sendMessage 到不了 content script，故不在此广播，靠 storage 事件传播。
       return { ok: true, site: host, enabled };

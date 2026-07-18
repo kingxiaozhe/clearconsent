@@ -2,7 +2,7 @@
 // popup 失焦即销毁——只读状态（get-site-state），长任务不放这里。
 import './style.css';
 import { sendMessage } from '@/utils/messaging';
-import { getLog, getRulesMeta, getWhitelist, setWhitelist } from '@/utils/storage';
+import { getLog, getRulesMeta, updateWhitelist } from '@/utils/storage';
 import { normalizeHost } from '@/utils/host';
 import { addHost, removeHost } from '@/utils/whitelist';
 import { badgeHtml, deriveState, receiptHtml, summarize, summaryHtml } from '@/utils/receipt-view';
@@ -73,8 +73,7 @@ async function render() {
       render();
     });
   document.querySelector('#trust-btn')?.addEventListener('click', async () => {
-    const wl = await getWhitelist();
-    await setWhitelist(state.whitelisted ? removeHost(wl, site) : addHost(wl, site));
+    await updateWhitelist((wl) => (state.whitelisted ? removeHost(wl, site) : addHost(wl, site)));
     render();
   });
   document.querySelector('#options-btn')?.addEventListener('click', () => {

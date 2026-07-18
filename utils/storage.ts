@@ -65,6 +65,24 @@ export const setSettings = (s: Settings) => setRaw('settings', s);
 export const getWhitelist = () => getRaw('whitelist');
 export const setWhitelist = (w: string[]) => setRaw('whitelist', w);
 
+/**
+ * 原子读改写（N4）：read-modify-write 整体进串行队列，避免「读在队列外」的并发末写覆盖。
+ * UI 多处改白名单/本站开关时用它，不要 get 完再 set。
+ */
+function updateRaw<K extends keyof Schema>(
+  key: K,
+  fn: (cur: Schema[K]) => Schema[K],
+): Promise<void> {
+  return serialize(async () => {
+    const got = await chrome.storage.local.get(key);
+    const cur = (got[key] as Schema[K]) ?? DEFAULTS[key];
+    await chrome.storage.local.set({ [key]: fn(cur) });
+  });
+}
+export const updateWhitelist = (fn: (w: string[]) => string[]) => updateRaw('whitelist', fn);
+export const updateSiteDisabled = (fn: (d: string[]) => string[]) => updateRaw('siteDisabled', fn);
+export const updateSettings = (fn: (s: Settings) => Settings) => updateRaw('settings', fn);
+
 export const getSiteDisabled = () => getRaw('siteDisabled');
 export const setSiteDisabled = (d: string[]) => setRaw('siteDisabled', d);
 
