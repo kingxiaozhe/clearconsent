@@ -38,32 +38,45 @@ export function validateSnapshot(data: unknown): string[] {
   const snap = data as Partial<RuleSnapshot>;
   if (typeof snap.version !== 'string') errs.push('version 缺失或非字符串');
   if (typeof snap.source !== 'string') errs.push('source 缺失或非字符串');
+  // 纯数据红线（CWS）：白名单在每一层都生效——根/规则/动作出现任何计划外字段一律拒绝，
+  // 防远程快照夹带 script/code/onload 之类字段落库（N4 拦截：旧版只查动作层）。
+  rejectUnknownKeys(data as object, ['version', 'source', 'rules'], '根', errs);
   if (!Array.isArray(snap.rules)) return [...errs, 'rules 非数组'];
   const seen = new Set<string>();
   snap.rules.forEach((r, i) => {
     const p = `rules[${i}]`;
-    if (!r || typeof r !== 'object') return errs.push(`${p} 非对象`);
+    if (!r || typeof r !== 'object') return errs.push(`${p} 非对象或 null`);
+    rejectUnknownKeys(r, ['id', 'name', 'detect', 'actions', 'hosts'], p, errs);
     if (typeof r.id !== 'string' || !r.id) errs.push(`${p}.id 缺失`);
     else if (seen.has(r.id)) errs.push(`${p}.id 重复: ${r.id}`);
     else seen.add(r.id);
     if (typeof r.detect !== 'string' || !r.detect) errs.push(`${p}.detect 缺失`);
+    if (r.actions === null || typeof r.actions !== 'object') {
+      errs.push(`${p}.actions 缺失或非对象`);
+      return;
+    }
+    rejectUnknownKeys(r.actions, STRATEGY_KEYS, `${p}.actions`, errs);
     for (const k of STRATEGY_KEYS) {
-      const acts = r.actions?.[k];
+      const acts = r.actions[k];
       if (!Array.isArray(acts)) {
         errs.push(`${p}.actions.${k} 非数组`);
         continue;
       }
       acts.forEach((a, j) => {
-        if (a.kind !== 'hide' && a.kind !== 'click') errs.push(`${p}.actions.${k}[${j}].kind 非法`);
-        if (typeof a.selector !== 'string' || !a.selector)
-          errs.push(`${p}.actions.${k}[${j}].selector 缺失`);
-        // 纯数据红线：动作里不允许出现函数/脚本字段
-        for (const key of Object.keys(a)) {
-          if (!['kind', 'selector', 'label', 'optional'].includes(key))
-            errs.push(`${p}.actions.${k}[${j}] 含非法字段 ${key}（纯数据红线）`);
-        }
+        const ap = `${p}.actions.${k}[${j}]`;
+        if (!a || typeof a !== 'object') return errs.push(`${ap} 非对象或 null`); // N4: null 动作曾打崩校验器
+        if (a.kind !== 'hide' && a.kind !== 'click') errs.push(`${ap}.kind 非法`);
+        if (typeof a.selector !== 'string' || !a.selector) errs.push(`${ap}.selector 缺失或空`);
+        rejectUnknownKeys(a, ['kind', 'selector', 'label', 'optional'], ap, errs);
       });
     }
   });
   return errs;
+}
+
+/** 计划外字段一律记为「纯数据红线」违规——白名单在根/规则/动作各层复用。 */
+function rejectUnknownKeys(obj: object, allowed: string[], path: string, errs: string[]): void {
+  for (const key of Object.keys(obj)) {
+    if (!allowed.includes(key)) errs.push(`${path} 含非法字段 ${key}（纯数据红线）`);
+  }
 }
