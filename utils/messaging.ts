@@ -10,6 +10,8 @@ interface MessageMap {
     payload: { site: string; enabled: boolean };
     response: { ok: boolean; site: string; enabled: boolean };
   };
+  // F4：options「立即检查更新」→ SW 拉取规则库
+  'check-rules-update': { payload: Record<string, never>; response: { updated: boolean } };
 }
 
 export type MessageType = keyof MessageMap;

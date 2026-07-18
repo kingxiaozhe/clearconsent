@@ -14,6 +14,9 @@ import {
 import { registerHandlers } from '@/utils/messaging';
 import { computeSiteState } from '@/utils/site-state';
 import { normalizeHost } from '@/utils/host';
+import { checkForUpdate } from '@/utils/rules-fetcher';
+
+const UPDATE_ALARM = 'rules-update';
 
 export default defineBackground(() => {
   // 顶层同步注册（休眠唤醒只重放顶层注册）。
@@ -49,11 +52,22 @@ export default defineBackground(() => {
       // N4：SW 的 runtime.sendMessage 到不了 content script，故不在此广播，靠 storage 事件传播。
       return { ok: true, site: host, enabled };
     },
+
+    // options「立即检查更新」入口（F4 T-018/T-020）
+    'check-rules-update': async () => ({ updated: await checkForUpdate() }),
+  });
+
+  // 规则库定时更新（F4）：24h alarm + 安装/冷启动补拉一次。alarms 权限见 wxt.config（PRD 豁免项）。
+  chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 24 * 60 });
+  chrome.alarms.onAlarm.addListener((a) => {
+    if (a.name === UPDATE_ALARM) checkForUpdate().catch(() => {});
   });
 
   // schema 初始化放 onInstalled（MV3 标准初始化位，安装/更新即唤醒 SW 执行）。
   chrome.runtime.onInstalled.addListener(() => {
-    ensureSchema().catch((e) => console.error('[ClearConsent] ensureSchema', e));
+    ensureSchema()
+      .then(() => checkForUpdate()) // 安装后补拉一次规则库
+      .catch((e) => console.error('[ClearConsent] onInstalled', e));
   });
   // SW 冷启动也补一次（幂等），保证读数据前 schema 就绪。
   ensureSchema().catch((e) => console.error('[ClearConsent] ensureSchema', e));

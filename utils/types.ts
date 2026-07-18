@@ -44,4 +44,6 @@ export interface RulesMeta {
   siteCount: number;
   source: 'builtin' | 'remote';
   updatedAt: number;
+  lastCheckAt?: number;
+  lastCheckError?: string | null;
 }

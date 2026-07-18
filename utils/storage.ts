@@ -89,6 +89,11 @@ export const setSiteDisabled = (d: string[]) => setRaw('siteDisabled', d);
 export const getRulesMeta = () => getRaw('rules-meta');
 export const setRulesMeta = (m: RulesMeta) => setRaw('rules-meta', m);
 
+/** 规则本体（'rules' key，体量大不入 Schema；rules-loader 读时会经 validateSnapshot 兜底）。 */
+export function setRawRules(snapshot: unknown): Promise<void> {
+  return serialize(() => chrome.storage.local.set({ rules: snapshot }));
+}
+
 export const getLog = () => getRaw('log');
 
 /**

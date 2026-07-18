@@ -4,11 +4,13 @@ import { mountOptions, registerTab } from './tabs';
 import { preferencesTab } from './tab-preferences';
 import { whitelistTab } from './tab-whitelist';
 import { logTab } from './tab-log';
+import { rulesTab } from './tab-rules';
 
-// tab 顺序 = 注册顺序。F3 偏好/信任站点在前，F2 日志在后，F4 规则库最后追加。
+// tab 顺序 = 注册顺序。F3 偏好/信任站点，F2 日志，F4 规则库与关于。
 registerTab(preferencesTab);
 registerTab(whitelistTab);
 registerTab(logTab);
+registerTab(rulesTab);
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (app) mountOptions(app);

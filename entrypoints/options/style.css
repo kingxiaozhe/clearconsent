@@ -180,3 +180,36 @@ table.log td:nth-child(4) {
 .pref input {
   margin-right: 8px;
 }
+.card-stat {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 40px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  max-width: 440px;
+}
+.card-stat .muted {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.card-stat b {
+  font-size: 15px;
+}
+.about {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.9;
+  padding-left: 18px;
+}
+.err {
+  color: #a8681e;
+  font-size: 13px;
+}
+#check-status {
+  margin-left: 10px;
+  font-size: 13px;
+}
