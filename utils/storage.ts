@@ -94,6 +94,11 @@ export function setRawRules(snapshot: unknown): Promise<void> {
   return serialize(() => chrome.storage.local.set({ rules: snapshot }));
 }
 
+/** 原子写规则本体 + meta（N4：分写中断会导致 rules=新/meta=旧的不一致，此处一次 set 两键）。 */
+export function setRulesAndMeta(snapshot: unknown, meta: RulesMeta): Promise<void> {
+  return serialize(() => chrome.storage.local.set({ rules: snapshot, 'rules-meta': meta }));
+}
+
 export const getLog = () => getRaw('log');
 
 /**

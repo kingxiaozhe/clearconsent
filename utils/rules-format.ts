@@ -51,6 +51,8 @@ export function validateSnapshot(data: unknown): string[] {
     else if (seen.has(r.id)) errs.push(`${p}.id 重复: ${r.id}`);
     else seen.add(r.id);
     if (typeof r.detect !== 'string' || !r.detect) errs.push(`${p}.detect 缺失`);
+    else if (isDangerousSelector(r.detect))
+      errs.push(`${p}.detect 过于宽泛（防规则污染，N4）: ${r.detect}`);
     if (r.actions === null || typeof r.actions !== 'object') {
       errs.push(`${p}.actions 缺失或非对象`);
       return;
@@ -67,6 +69,9 @@ export function validateSnapshot(data: unknown): string[] {
         if (!a || typeof a !== 'object') return errs.push(`${ap} 非对象或 null`); // N4: null 动作曾打崩校验器
         if (a.kind !== 'hide' && a.kind !== 'click') errs.push(`${ap}.kind 非法`);
         if (typeof a.selector !== 'string' || !a.selector) errs.push(`${ap}.selector 缺失或空`);
+        // N4：click 动作尤其危险（可点任意按钮）——宽泛选择器一律拒（防远程规则污染点击任意元素）
+        else if (a.kind === 'click' && isDangerousSelector(a.selector))
+          errs.push(`${ap}.selector 过于宽泛（click 防污染，N4）: ${a.selector}`);
         rejectUnknownKeys(a, ['kind', 'selector', 'label', 'optional'], ap, errs);
       });
     }
@@ -79,4 +84,16 @@ function rejectUnknownKeys(obj: object, allowed: string[], path: string, errs: s
   for (const key of Object.keys(obj)) {
     if (!allowed.includes(key)) errs.push(`${path} 含非法字段 ${key}（纯数据红线）`);
   }
+}
+
+/**
+ * 过于宽泛的选择器（N4 防规则污染）：远程规则若用 `*`/裸标签/`:root` 等匹配全站元素，
+ * 可点击任意按钮或隐藏大片内容。合法 CMP 选择器都是带 id/class 的具体路径。
+ */
+const DANGEROUS = new Set(['*', 'body', 'html', ':root', 'div', 'button', 'a', 'span', 'input']);
+function isDangerousSelector(sel: string): boolean {
+  const s = sel.trim().toLowerCase();
+  if (DANGEROUS.has(s)) return true;
+  // 无 id(#)/class(.)/属性([) 锚点的纯标签组合视为过宽（如 "div button"）
+  return !/[#.[]/.test(s);
 }

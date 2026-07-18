@@ -56,3 +56,20 @@ describe('validateSnapshot 安全闸', () => {
     expect(validateSnapshot(s).some((e) => e.includes('重复'))).toBe(true);
   });
 });
+
+describe('危险选择器防污染（N4 F4）', () => {
+  const base = () => structuredClone(BUILTIN_SNAPSHOT);
+  it('detect 用 * 被拒', () => {
+    const s = base();
+    s.rules[0].detect = '*';
+    expect(validateSnapshot(s).some((x) => x.includes('过于宽泛'))).toBe(true);
+  });
+  it('click 用裸 button 被拒', () => {
+    const s = base();
+    s.rules[0].actions['essential-only'] = [{ kind: 'click', selector: 'button', label: 'x' }];
+    expect(validateSnapshot(s).some((x) => x.includes('过于宽泛'))).toBe(true);
+  });
+  it('内置快照(具体选择器)仍合法', () => {
+    expect(validateSnapshot(BUILTIN_SNAPSHOT)).toEqual([]);
+  });
+});

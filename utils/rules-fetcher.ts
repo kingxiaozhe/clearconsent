@@ -1,6 +1,6 @@
 // 规则更新的 SW 副作用层（拉取+校验+落库）。纯逻辑在 rules-update.ts，此处只做 IO。
 // 合规红线：只访问固定 GitHub Raw URL，不带任何用户数据（无 cookie/无标识参数）。
-import { getRulesMeta, setRulesMeta, setRawRules } from './storage';
+import { getRulesMeta, setRulesMeta, setRulesAndMeta } from './storage';
 import {
   shouldUpdate,
   validateManifest,
@@ -47,8 +47,8 @@ export async function checkForUpdate(): Promise<boolean> {
     const result = validateRemoteRules(text, manifest);
     if ('errors' in result) throw new Error(`规则校验失败: ${result.errors[0]}`);
 
-    await setRawRules(result.snapshot);
-    await setRulesMeta({
+    // 原子写：规则本体 + meta 一次落库（N4：分写中断会致 rules=新/meta=旧不一致）
+    await setRulesAndMeta(result.snapshot, {
       version: manifest.version,
       siteCount: manifest.siteCount,
       source: 'remote',

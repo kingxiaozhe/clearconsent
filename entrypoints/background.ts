@@ -57,10 +57,17 @@ export default defineBackground(() => {
     'check-rules-update': async () => ({ updated: await checkForUpdate() }),
   });
 
-  // 规则库定时更新（F4）：24h alarm + 安装/冷启动补拉一次。alarms 权限见 wxt.config（PRD 豁免项）。
-  chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 24 * 60 });
+  // 规则库定时更新（F4）。alarms 权限见 wxt.config（PRD 豁免项）。
   chrome.alarms.onAlarm.addListener((a) => {
     if (a.name === UPDATE_ALARM) checkForUpdate().catch(() => {});
+  });
+  // N4③：只在 alarm 不存在时创建——每次 SW 冷启动重建会重置 24h 周期,频繁唤醒会饿死更新。
+  chrome.alarms.get(UPDATE_ALARM).then((existing) => {
+    if (!existing) chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 24 * 60 });
+  });
+  // N4③：冷启动兜底——距上次检查超 24h 则补拉一次（alarm 因浏览器重启等错过时的保险）。
+  getRulesMeta().then((m) => {
+    if (Date.now() - (m.lastCheckAt ?? 0) > 24 * 60 * 60 * 1000) checkForUpdate().catch(() => {});
   });
 
   // schema 初始化放 onInstalled（MV3 标准初始化位，安装/更新即唤醒 SW 执行）。
