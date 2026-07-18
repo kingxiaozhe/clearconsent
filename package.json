@@ -17,7 +17,8 @@
     "typecheck": "tsc --noEmit",
     "test:e2e": "wxt build && playwright test",
     "test": "vitest run",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run",
+    "screenshot": "node scripts/screenshot-extension.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",
