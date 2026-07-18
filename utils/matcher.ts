@@ -50,7 +50,9 @@ export function detectCmp(rules: CmpRule[], opts: DetectOptions = {}): Promise<M
       const m = matchNow(rules, root);
       if (m) finish(m);
     });
-    observer.observe(root.documentElement ?? root, { childList: true, subtree: true });
+    // 观察 document 节点本身（而非 documentElement）——某些框架会替换整个 <html>，
+    // 绑 documentElement 会在换根后失聪，绑 document 覆盖换根（N4 拦截）。
+    observer.observe(root, { childList: true, subtree: true });
     const timer = setTimeout(() => finish(null), timeoutMs);
   });
 }

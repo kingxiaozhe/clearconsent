@@ -77,4 +77,15 @@ describe('detectCmp（异步）', () => {
     const m = await detectCmp(rules, { timeoutMs: 200 });
     expect(m).toBeNull();
   });
+
+  it('整个 <html> 被替换后新树中的 CMP 仍能命中（N4 换根拦截）', async () => {
+    const p = detectCmp(rules, { timeoutMs: 2000 });
+    setTimeout(() => {
+      const html = document.createElement('html');
+      html.innerHTML = '<body><div id="cmp-a"></div></body>';
+      document.replaceChild(html, document.documentElement);
+    }, 50);
+    const m = await p;
+    expect(m?.rule.id).toBe('a');
+  });
 });
