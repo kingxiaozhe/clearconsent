@@ -147,3 +147,36 @@ table.log td:nth-child(4) {
   color: var(--muted);
   margin-top: 4px;
 }
+.tag {
+  font-size: 11px;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 1px 6px;
+  margin-left: 6px;
+}
+.sep {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 22px 0;
+}
+.global small,
+.pref small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 3px;
+}
+.txt {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 7px 12px;
+  font-size: 13px;
+  min-width: 240px;
+}
+.right {
+  text-align: right;
+}
+.pref input {
+  margin-right: 8px;
+}

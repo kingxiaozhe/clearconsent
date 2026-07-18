@@ -54,18 +54,20 @@ test('service worker 注册且 manifest 名称正确', async () => {
   expect(new URL(sw.url()).host).toMatch(/^[a-z]{32}$/);
 });
 
-test('popup 能打开并渲染 ClearConsent', async () => {
+test('popup 能打开并渲染品牌头', async () => {
   const extId = new URL((await swReady).url()).host;
   const page = await context.newPage();
   await page.goto(`chrome-extension://${extId}/popup.html`);
-  await expect(page.locator('#app')).toContainText('ClearConsent');
+  // 品牌字标始终渲染（无活动标签的兜底分支也保留头部）
+  await expect(page.locator('.wordmark')).toContainText('ClearConsent');
   await page.close();
 });
 
-test('options 页能打开', async () => {
+test('options 页能打开并渲染 tab 外壳', async () => {
   const extId = new URL((await swReady).url()).host;
   const page = await context.newPage();
   await page.goto(`chrome-extension://${extId}/options.html`);
-  await expect(page.locator('#app')).toContainText('ClearConsent 设置');
+  await expect(page.locator('.brand')).toContainText('ClearConsent');
+  await expect(page.locator('.nav')).toContainText('处理偏好'); // 首个 tab 渲染
   await page.close();
 });

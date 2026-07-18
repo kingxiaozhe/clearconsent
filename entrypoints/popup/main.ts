@@ -2,8 +2,9 @@
 // popup 失焦即销毁——只读状态（get-site-state），长任务不放这里。
 import './style.css';
 import { sendMessage } from '@/utils/messaging';
-import { getLog, getRulesMeta } from '@/utils/storage';
+import { getLog, getRulesMeta, getWhitelist, setWhitelist } from '@/utils/storage';
 import { normalizeHost } from '@/utils/host';
+import { addHost, removeHost } from '@/utils/whitelist';
 import { badgeHtml, deriveState, receiptHtml, summarize, summaryHtml } from '@/utils/receipt-view';
 import type { SiteState } from '@/utils/types';
 
@@ -24,7 +25,10 @@ async function render() {
   if (!app) return;
   const site = await currentSite();
   if (!site) {
-    app.innerHTML = `<div class="pad"><p class="receipt-empty">当前页面不适用。</p></div>`;
+    // 无可处理站点（如浏览器内部页）：仍渲染品牌头,保持一致外观
+    app.innerHTML = `
+      <header class="hd"><span class="wordmark">ClearConsent<span class="dot">.</span></span></header>
+      <div class="pad"><p class="receipt-empty">当前页面不适用。</p></div>`;
     return;
   }
   const state: SiteState = (await sendMessage('get-site-state', { site })) ?? {
@@ -53,8 +57,9 @@ async function render() {
         <span>在本站启用</span>
         <input type="checkbox" id="site-toggle" ${
           state.enabled && !state.whitelisted ? 'checked' : ''
-        } />
+        } ${state.whitelisted ? 'disabled' : ''} />
       </label>
+      <button id="trust-btn" class="link">${state.whitelisted ? '移出信任站点' : '加入信任站点'}</button>
       <button id="options-btn" class="link">设置与透明日志</button>
     </div>
     <footer class="ft">零数据收集 · 无支付集成 · 开源 · 规则库 ${rulesMeta.version}</footer>
@@ -67,6 +72,11 @@ async function render() {
       await sendMessage('set-site-enabled', { site, enabled });
       render();
     });
+  document.querySelector('#trust-btn')?.addEventListener('click', async () => {
+    const wl = await getWhitelist();
+    await setWhitelist(state.whitelisted ? removeHost(wl, site) : addHost(wl, site));
+    render();
+  });
   document.querySelector('#options-btn')?.addEventListener('click', () => {
     chrome.runtime.openOptionsPage();
   });
