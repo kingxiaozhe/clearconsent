@@ -148,5 +148,124 @@ export const BUILTIN_SNAPSHOT: RuleSnapshot = {
         ],
       },
     },
+    {
+      // Sourcepoint：欧盟媒体最主流 CMP（Guardian/Spiegel 等）。弹窗在 message container 内，
+      // 「拒绝」按钮文案多变，用属性/aria 选择器兜底；无稳定拒绝路径时退化为隐藏容器（不误点同意）。
+      id: 'sourcepoint',
+      name: 'Sourcepoint',
+      detect: '[id^="sp_message_container"], .sp_veil, .sp-message-open',
+      actions: {
+        'essential-only': [
+          {
+            kind: 'click',
+            selector:
+              'button[title="Reject"], button[aria-label*="Reject"], button[title*="Nur notwendige"], button[aria-label*="必要"]',
+            label: '点击「拒绝/仅必要」',
+            optional: true,
+          },
+          {
+            kind: 'hide',
+            selector: '[id^="sp_message_container"]',
+            label: '隐藏 Sourcepoint 弹窗（无拒绝路径兜底）',
+            optional: true,
+          },
+        ],
+        'reject-all-first': [
+          {
+            kind: 'click',
+            selector:
+              'button[title="Reject"], button[aria-label*="Reject"], button[title*="Reject All"]',
+            label: '点击「全部拒绝」',
+            optional: true,
+          },
+          {
+            kind: 'hide',
+            selector: '[id^="sp_message_container"]',
+            label: '隐藏 Sourcepoint 弹窗（兜底）',
+            optional: true,
+          },
+        ],
+        'hide-only': [
+          {
+            kind: 'hide',
+            selector: '[id^="sp_message_container"]',
+            label: '隐藏 Sourcepoint 弹窗',
+          },
+          { kind: 'hide', selector: '.sp_veil', label: '隐藏遮罩', optional: true },
+        ],
+      },
+    },
+    {
+      // Usercentrics：德国/欧盟高频。UI 在 shadow DOM（#usercentrics-root），
+      // 拒绝按钮用 data-testid；content script 的 isolated world 仍可 querySelector 到 host。
+      id: 'usercentrics',
+      name: 'Usercentrics',
+      detect: '#usercentrics-root, #usercentrics-cmp-ui, [data-testid="uc-container"]',
+      actions: {
+        'essential-only': [
+          {
+            kind: 'click',
+            selector: '[data-testid="uc-deny-all-button"], button[data-testid*="deny"]',
+            label: '点击「拒绝全部」',
+            optional: true,
+          },
+          {
+            kind: 'hide',
+            selector: '#usercentrics-root',
+            label: '隐藏 Usercentrics（兜底）',
+            optional: true,
+          },
+        ],
+        'reject-all-first': [
+          {
+            kind: 'click',
+            selector: '[data-testid="uc-deny-all-button"]',
+            label: '点击「拒绝全部」',
+            optional: true,
+          },
+          {
+            kind: 'hide',
+            selector: '#usercentrics-root',
+            label: '隐藏 Usercentrics（兜底）',
+            optional: true,
+          },
+        ],
+        'hide-only': [{ kind: 'hide', selector: '#usercentrics-root', label: '隐藏 Usercentrics' }],
+      },
+    },
+    {
+      // TCF v2 通用兜底：大量自建/长尾 CMP 遵循 IAB TCF，容器常带 cmp/consent 标识。
+      // 无法可靠找拒绝按钮，只做隐藏（hide-only 语义）——放在最后，前面具体规则优先命中。
+      id: 'tcf-generic',
+      name: 'TCF 通用兜底',
+      detect: '[class*="cmp-banner"], [id*="cmpbox"], [class*="consent-banner"][role="dialog"]',
+      actions: {
+        // 通用兜底不猜「拒绝」按钮（怕误点同意），三档都只隐藏
+        'essential-only': [
+          {
+            kind: 'hide',
+            selector: '[class*="cmp-banner"], [id*="cmpbox"]',
+            label: '隐藏通用 CMP 横幅（无拒绝路径）',
+            optional: true,
+          },
+        ],
+        'reject-all-first': [
+          {
+            kind: 'hide',
+            selector: '[class*="cmp-banner"], [id*="cmpbox"]',
+            label: '隐藏通用 CMP 横幅（无拒绝路径）',
+            optional: true,
+          },
+        ],
+        'hide-only': [
+          {
+            kind: 'hide',
+            selector: '[class*="cmp-banner"], [id*="cmpbox"]',
+            label: '隐藏通用 CMP 横幅',
+            optional: true,
+          },
+        ],
+      },
+    },
   ],
 };

@@ -43,10 +43,22 @@ let swReady: Promise<Worker>;
 let server: http.Server;
 let baseUrl: string;
 
+// Sourcepoint fixture：无稳定拒绝按钮 → 测兜底隐藏（essential-only 的 hide optional 命中）
+const SP_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>sp-fixture</title></head>
+<body><h1>host</h1>
+<script>
+  setTimeout(() => {
+    const veil = document.createElement('div'); veil.className = 'sp_veil'; document.body.appendChild(veil);
+    const c = document.createElement('div'); c.id = 'sp_message_container_998877';
+    c.style.height = '200px'; c.innerHTML = '<p>We value your privacy</p><button title="Accept">Accept</button>';
+    document.body.appendChild(c);
+  }, 400);
+</script></body></html>`;
+
 test.beforeAll(async () => {
-  server = http.createServer((_req, res) => {
+  server = http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    res.end(PAGE);
+    res.end(req.url?.startsWith('/sp') ? SP_PAGE : PAGE);
   });
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
   const addr = server.address();
@@ -93,5 +105,23 @@ test('处理后 SW 写入一条 process-result 日志', async () => {
   const hit = log.find((l) => l.ruleId === 'onetrust');
   expect(hit, '应有 onetrust 处理日志').toBeTruthy();
   expect(hit?.outcome).toBe('handled');
+  await page.close();
+});
+
+test('Sourcepoint 无拒绝按钮时兜底隐藏弹窗（覆盖率缺口补测）', async () => {
+  await swReady;
+  const page = await context.newPage();
+  await page.goto(baseUrl + 'sp');
+  // sp_message_container 400ms 后注入；无稳定拒绝按钮 → 扩展 essential-only 走 hide 兜底
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const el = document.querySelector<HTMLElement>('[id^="sp_message_container"]');
+          return el ? getComputedStyle(el).display : 'absent';
+        }),
+      { timeout: 8000 },
+    )
+    .toBe('none'); // 被隐藏
   await page.close();
 });
