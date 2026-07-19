@@ -67,12 +67,44 @@ test.beforeAll(async () => {
   const executablePath = resolveExecutable();
   context = await chromium.launchPersistentContext('', {
     ...(executablePath ? { executablePath } : { channel: 'chromium' }),
-    headless: false,
-    args: [`--disable-extensions-except=${EXT_PATH}`, `--load-extension=${EXT_PATH}`],
+    // 新无头模式（--headless=new）支持 MV3 扩展且在无显示器/CI 环境稳定；
+    // 旧 headless:false 依赖真实显示，在无头 shell 里会退化 flaky（实测根因）。
+    headless: true,
+    args: [
+      '--headless=new',
+      `--disable-extensions-except=${EXT_PATH}`,
+      `--load-extension=${EXT_PATH}`,
+    ],
   });
-  const existing = context.serviceWorkers();
-  swReady = existing[0] ? Promise.resolve(existing[0]) : context.waitForEvent('serviceworker');
+  swReady = acquireServiceWorker(context);
 });
+
+// N4：SW 在测试间会 idle 停机——复用旧引用做 evaluate 会 "Worker was closed"。
+// 需要时用本函数重新获取"活的"SW（已存在/新事件/轮询三路取先到）。
+function acquireServiceWorker(ctx: BrowserContext): Promise<Worker> {
+  const now = ctx.serviceWorkers();
+  if (now[0]) return Promise.resolve(now[0]);
+  const byEvent = ctx.waitForEvent('serviceworker');
+  const byPoll = (async () => {
+    const deadline = Date.now() + 12_000;
+    while (Date.now() < deadline) {
+      const [sw] = ctx.serviceWorkers();
+      if (sw) return sw;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    throw new Error('poll timeout');
+  })();
+  return Promise.race([byEvent, byPoll]);
+}
+
+/** 唤醒并取活的 SW：先开一个扩展页触发 SW 启动，再取引用。用于 sw.evaluate 前。 */
+async function wakeServiceWorker(ctx: BrowserContext, extId: string): Promise<Worker> {
+  const ping = await ctx.newPage();
+  await ping.goto(`chrome-extension://${extId}/options.html`).catch(() => {});
+  const sw = await acquireServiceWorker(ctx);
+  await ping.close();
+  return sw;
+}
 
 test.afterAll(async () => {
   await context?.close();
@@ -93,11 +125,12 @@ test('默认策略处理假 OneTrust 弹窗：点击拒绝按钮', async () => {
 });
 
 test('处理后 SW 写入一条 process-result 日志', async () => {
-  const sw = await swReady;
+  const extId = new URL((await swReady).url()).host;
   const page = await context.newPage();
   await page.goto(baseUrl);
   await page.waitForTimeout(2000); // 等处理+上报
-  // 从 SW 侧读 storage.local.log，应含本 fixture 站点的记录
+  // N4：SW 可能已 idle 停机——唤醒并取活引用再 evaluate（否则 "Worker was closed"）
+  const sw = await wakeServiceWorker(context, extId);
   const log = await sw.evaluate(async () => {
     const got = await chrome.storage.local.get('log');
     return (got.log as Array<{ site: string; ruleId: string; outcome: string }>) ?? [];

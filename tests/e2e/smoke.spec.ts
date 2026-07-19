@@ -43,8 +43,14 @@ test.beforeAll(async () => {
   const executablePath = resolveExecutable();
   context = await chromium.launchPersistentContext('', {
     ...(executablePath ? { executablePath } : { channel: 'chromium' }),
-    headless: false,
-    args: [`--disable-extensions-except=${EXT_PATH}`, `--load-extension=${EXT_PATH}`],
+    // 新无头模式（--headless=new）支持 MV3 扩展且在无显示器/CI 环境稳定；
+    // 旧 headless:false 依赖真实显示，在无头 shell 里会退化 flaky（实测根因）。
+    headless: true,
+    args: [
+      '--headless=new',
+      `--disable-extensions-except=${EXT_PATH}`,
+      `--load-extension=${EXT_PATH}`,
+    ],
   });
   // 立刻同步挂 waitForEvent 捕获 SW 引用（worker.url() 在停止后仍可用）。
   // N4（T-005 补审）：残留竞态——若 SW 在 launch 返回前就注册并 idle 停机，serviceWorkers()
