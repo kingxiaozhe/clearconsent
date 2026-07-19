@@ -25,7 +25,7 @@ export const rulesTab: OptionsTab = {
         <div><span class="muted">来源</span><b>${m.source === 'remote' ? '在线更新' : '内置'}</b></div>
         <div><span class="muted">最近检查</span><b>${esc(last)}</b></div>
       </div>
-      ${m.lastCheckError ? `<p class="err">上次检查失败：${esc(m.lastCheckError)}（已回退到现有规则）</p>` : ''}
+      ${m.lastCheckError ? `<p class="hint">当前使用内置规则库（暂未连接在线更新源，不影响使用）。</p>` : ''}
       <button id="check-btn" class="btn">立即检查更新</button>
       <span id="check-status" class="muted"></span>
       <hr class="sep" />
